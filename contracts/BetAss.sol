@@ -26,9 +26,10 @@ pragma solidity ^0.6.9;
 import "./EIP20Interface.sol";
 
 contract BetAss {
-	uint256 constant odds_denom = 10000; // what we divide odds by for the chance of a true outcome
+	uint256 constant odds_denom = 100; // what we divide odds by for the chance of a true outcome
+	uint256 constant MAX_PUB_STAKERS = 100; // what we use to instantiate the array
 	
-	address owner; // the address of the contract creator, will be owner b/c they fully own one side of bet
+	address payable owner; // the address of the contract creator, will be owner b/c they fully own one side of bet
 	uint256 odds; // chance of true outcome --> odds / odds_denom
 	
 	// Formula to ensure equal odds weighted betting pool:
@@ -41,9 +42,15 @@ contract BetAss {
 	// vars for the public stakers: call public whoever takes the opposite side of the owner
 	uint256 total_public_stake; // total value that the public needs to put on the opposite side of this bet
 	mapping (address => uint256) public public_stakes; // mapping to hold the list of all public stakers
+	address[] public_stakers; // place to store all addresses that have staked, just keys of above map
 	uint256 curr_public_stake; // how much has currently been staked by the public
 	bool public_funded; // only true when total_public_stake == curr_public_stake
 	
+	enum Outcome { OWNER, PUBLIC } // for the 2 possible winners of the contract
+	Outcome winner;
+	bool executed; // flag after the execute function has been run.
+	bool paid; // flag after the winnings have been paid out
+
 	// token that will be what this bet is denominated in
 	EIP20Interface token;
 	address token_address;
@@ -57,8 +64,9 @@ contract BetAss {
     	owner = msg.sender;
     	odds = _odds;
     	owner_stake = _stake;
-    	// TODO: actually calculate the public stake correctly using proportions
-    	total_public_stake = _stake; 
+    	// TODO: higher precision calculation
+    	total_public_stake = (odds_denom / odds) * owner_stake; 
+    	public_stakers = new address[](MAX_PUB_STAKERS);
     	// creates an instance of the token contract to be used throughout the bet contract
     	token_address = _token_address;
     	token = EIP20Interface(_token_address);
@@ -76,11 +84,9 @@ contract BetAss {
 		// verifies the sender
 		require(msg.sender == owner, "only the contract owner can fund this bet");
 		// verifies that contract has sufficient allowance to initiate the transfer
-		uint256 allowed = token.allowance(owner, address(this));
-		require(allowed >= owner_stake, "Insufficient allowance for contract to be funded");
+		checkAllowance(owner, address(this), owner_stake);
 		// Initiates the transfer
-		bool transferred = token.transferFrom(owner, address(this), owner_stake);
-		require(transferred, "funding not successful");
+		transferCoin(owner, address(this), owner_stake);
 		// only reach this line if the contract has been funded
 		owner_funded = true;
 		return true;		
@@ -100,14 +106,18 @@ contract BetAss {
 		// checks that there's enough room left in the public money pool
 		require(stake <= total_public_stake - curr_public_stake,
 				"Requested stake would oversubscribe the bet: stake less.");
+		// makes sure stake is nonzero
+		require(stake > 0, "Must stake a positive amount of tokens");
 		// checks that there is sufficient alloance
-		uint256 allowed = token.allowance(msg.sender, address(this));
-		require(allowed >= stake, "Insufficient allowance for requested stake to be executed");
+		checkAllowance(msg.sender, address(this), stake);
 		// initiates the transfer
-		bool transferred = token.transferFrom(msg.sender, address(this), stake);
-		require(transferred, "funding not successful");
+		transferCoin(msg.sender, address(this), stake);
 		// means we succeeded, so add msg.sender to the public stakers
-		public_stakes[msg.sender] += stake; // maps are 0 initialized, so this is fine
+		if (public_stakes[msg.sender] == 0) {
+			// means that this sender has not staked before
+			public_stakers[public_stakers.length-1] = msg.sender;
+		}
+		public_stakes[msg.sender] += stake; // maps are 0 initialized, so this is fine\
 		curr_public_stake += stake;
 		// updates the public_funded var
 		if (curr_public_stake == total_public_stake) {
@@ -116,20 +126,113 @@ contract BetAss {
 	}
 
 	/*
-	TODO: execute contract. Where the winner will be deceided and paid.
+	Execute the contract in the following steps:
+	- Check that the contract can be executed.
+	- Run the random number generator.
+	- Set winner var to owner or public.
 	*/
 	function executeBet() public returns(bool outcome) {
-		return false;
+		// checks that the owner is executing the contract
+		require(msg.sender == owner, "Only the contract owner can execute the contract");
+		// make sure that both sides of the bet are funded
+		require(owner_funded, "This contract has not been funded by its owner yet");
+		require(public_funded, "This contract's public betting pool has not been fully funded yet");
+		// Run the RNG, effectively executing the bet
+		uint256 rand = randomInt(odds_denom);
+		executed = true;
+		// By definition, the owner always takes the under.
+ 		if (rand < odds) {
+			// means the owner won
+			winner = Outcome.OWNER;
+		} else {
+			// means the public won
+			winner = Outcome.PUBLIC;
+		}
+		return !(rand < odds); // returns if the owner won the bet
 	}
 
 	/*
-	Returns the amount staker has staked in the public pool.
+	The randomness engine of this contract. Will return a pseudo random integer
+	in the range [0, max).
 	*/
+	function randomInt(uint256 max) internal returns (uint256 rand) {
+		return uint256(keccak256(abi.encode(block.timestamp, block.difficulty)))%max;
+	}
+
+	/*	
+	Once the contract has been executed, anyone can call this function to payout
+	the winner of the bet.
+	*/
+	function payoutWinner() public returns (bool success) {
+		// check that the contract has been executed
+		require(executed, "Must execute the contract before payout");
+		// pays out depending on the winner
+		uint256 payout = owner_stake + total_public_stake;
+		if (winner == Outcome.OWNER) {
+			// means the contract owner gets the full balance
+			// does the transfer
+			transferCoin(address(this), owner, payout);
+		} else {
+			uint256 contribution;
+			uint256 pub_payout;
+			for (uint i=0; i < public_stakers.length; i++) {
+				// calculates the addresses contribution
+				contribution = public_stakes[public_stakers[i]];
+				// calculates how much payout they get
+				pub_payout = (contribution / total_public_stake) * payout;
+				// does the transfer
+				transferCoin(address(this), public_stakers[i], pub_payout);
+			}
+			// pays the first public staker whatever was left over
+			uint256 leftover = token.balanceOf(address(this));
+			transferCoin(address(this), public_stakers[0], leftover);
+		}
+		paid = true;
+		return true;
+	}
+
+	/*
+	Self destruct function to run after the bet has been executed and payed out.
+	Needs to be run by the contract owner.
+	*/
+	function closeContract() public returns (bool success) {
+		// checks that the call is coming from the contract owner
+		require(msg.sender == owner, "Only the owner can close this contract");
+		// checks that the contract has already been paid out
+		require(paid, "Contract can only be closed after the bet pool has been paid out");
+		selfdestruct(owner);
+		return true;
+	}
+
+	// 
+	// TRANSACTION HELPER FUNCTIONS
+	//
+	/* checks that token allowance from --> to is > min */
+	function checkAllowance(address _from, address _to, uint256 min)  internal returns(bool success){
+		uint256 allowed = token.allowance(_from, _to);
+		require(allowed >= min, "Insufficient allowance for requested stake to be executed");
+		return true;
+	}
+
+	/* Helper function for doing coin transfers. Includes an error message.*/	
+	function transferCoin(address _from, address _to, uint256 amount) internal returns(bool success) {
+		// if sending coin from this contract, adds an allowance
+		if (_from == address(this)) {
+			token.approve(_to, amount);
+		}
+		bool transferred = token.transferFrom(_from, _to, amount);
+		require(transferred, "token transfer not successful");
+		return true;
+	}
+
+	//
+	// VARIABLE GET FUNCTIONS
+	//
+	/*Returns the amount staker has staked in the public pool.*/
 	function getStake(address staker) public view returns(uint256 _stake) {
 		return public_stakes[staker];
 	}
 
-	// get functions for all main variables
 	function getOdds() public view returns(uint256 _odds) {
 		return odds;
 	}
@@ -160,6 +263,14 @@ contract BetAss {
 
 	function tokenAddress() public view returns(address _token_address) {
 		return token_address;
+	}
+
+	function getWinner() public view returns(bool ownerWon) {
+		if (winner == Outcome.OWNER) {
+			return true;
+		} else {
+			return false;
+		}
 	}
 }
 

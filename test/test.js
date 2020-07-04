@@ -60,9 +60,11 @@ contract("AssCoin test", async accounts => {
 });
 
 contract("BetAss test", async accounts => {
-	it("should set odds to 5000", async () => {
+	it("should set odds to 5", async () => {
 		let instance = await BetAss.deployed();
 		let odds = await instance.getOdds.call();
-		assert.equal(odds.valueOf(), 5000);
-	})
+		assert.equal(odds.valueOf(), 5);
+	});
+
+	
 })
