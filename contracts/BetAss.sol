@@ -36,7 +36,6 @@ contract BetAss {
 	
 	// vars for the owner information
 	uint256 owner_stake;
-	bool owner_side;
 	bool owner_funded; // whether the owner has staked their side of the bet.
 	
 	// vars for the public stakers: call public whoever takes the opposite side of the owner
@@ -52,14 +51,12 @@ contract BetAss {
 	constructor(
 		uint256 _odds, 
 		uint256 _stake, // how much the contract owner is staking on their side of the bet
-		bool _side, // what side of the bet the contract owner is on.
 		address _token_address 
 	) public {
     	// set the owner of the contract
     	owner = msg.sender;
     	odds = _odds;
     	owner_stake = _stake;
-    	owner_side = _side;
     	// TODO: actually calculate the public stake correctly using proportions
     	total_public_stake = _stake; 
     	// creates an instance of the token contract to be used throughout the bet contract
