@@ -1,4 +1,5 @@
 const MetaCoin = artifacts.require("AssCoin");
+const BetAss = artifacts.require("BetAss")
 
 contract("AssCoin test", async accounts => {
 	it("should put 10000 MetaCoin in the first account", async () => {
@@ -57,3 +58,11 @@ contract("AssCoin test", async accounts => {
 			});
 	});
 });
+
+contract("BetAss test", async accounts => {
+	it("should set odds to 5000", async () => {
+		let instance = await BetAss.deployed();
+		let odds = await instance.getOdds.call();
+		assert.equal(odds.valueOf(), 5000);
+	})
+})

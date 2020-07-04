@@ -45,13 +45,13 @@ contract AssCoin is EIP20Interface {
     }
 
     function transferFrom(address _from, address _to, uint256 _value) public override returns (bool success) {
-        uint256 allowance = allowed[_from][msg.sender];
+        uint256 allowance = allowed[_from][_to];
         require(balances[_from] >= _value, "Insufficient funds");
-        require(allowance >= _value, "Insufficient allowance");
+        require(allowance >= _value, "Insufficient allowance: yo");
         balances[_to] += _value;
         balances[_from] -= _value;
         if (allowance < MAX_UINT256) {
-            allowed[_from][msg.sender] -= _value;
+            allowed[_from][_to] -= _value;
         }
         emit Transfer(_from, _to, _value); //solhint-disable-line indent, no-unused-vars
         return true;
