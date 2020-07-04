@@ -16,7 +16,9 @@ These are very simple coin flip style bets. Each bet is parameterized by:
 
 Then a public betting pool (essentially everyone that will put up the opposite side of the bet at even money stakes) is fully determined.
 
-The contract facilitates all of the funding, bet execution and payouts. Still a work in progress.
+The contract facilitates all of the funding, bet execution and payouts. This contract is meant to be deployed many times, one for each bet made. 
+
+Example deployed [here](https://ropsten.etherscan.io/token/0x3BB69Aa89681f8dB97D4f2984B3b97b81E019036)
 
 ### Prereqs
 - Node.js
