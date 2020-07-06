@@ -13,12 +13,20 @@ These are very simple coin flip style bets. Each bet is parameterized by:
 
 - probability of success (for the owner)
 - how much the owner will stake on success.
+- which token the stake will be denominated in (must be an EIP20 token).
 
 Then a public betting pool (essentially everyone that will put up the opposite side of the bet at even money stakes) is fully determined.
 
-The contract facilitates all of the funding, bet execution and payouts. This contract is meant to be deployed many times, one for each bet made. 
+The contract facilitates all of the funding, bet execution and payouts. This contract is meant to be deployed many times, one for each bet made.
 
-Example deployed [here](https://ropsten.etherscan.io/token/0x3BB69Aa89681f8dB97D4f2984B3b97b81E019036)
+The architecture for the contract is essentially an implicit state machine, with the following states and transitions: contract creation --> owner funding --> public funding --> bet execution (run RNG) --> payout --> contract self destruct.
+
+Example deployed [here](https://ropsten.etherscan.io/token/0x93031aBF353307463e30cCC0916cc376627E8D7c). In terms of the states above, this contract has been paid out, but not self destructed. It was created with the following parameters:
+
+- Odds: 50 / 100
+- Stake: 1
+- Token: AssCoin (duh) linked above.
+
 
 ### Prereqs
 - Node.js

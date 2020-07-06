@@ -6529,12 +6529,12 @@
         }
       },
       "links": {},
-      "address": "0xbcC48a41B0ee00C6C196324D87B182C935E017a3",
-      "transactionHash": "0xa60c3c0671503647afcde68ca5ef588e92ae09bdf44b7a1d52dbc2b921c15141"
+      "address": "0xbCdEF55F69C5A855A3BC6A3Fb860a3F9b1A4e963",
+      "transactionHash": "0x06e1d1356d5c0b40fa7bbf458dcf3411d7c833e6ac207e9df855cd558a3f27e7"
     }
   },
   "schemaVersion": "3.2.1",
-  "updatedAt": "2020-07-04T06:44:16.943Z",
+  "updatedAt": "2020-07-06T03:02:42.021Z",
   "networkType": "ethereum",
   "devdoc": {
     "methods": {}

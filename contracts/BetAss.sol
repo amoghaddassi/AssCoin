@@ -197,7 +197,8 @@ contract BetAss {
 	function transferCoin(address _from, address _to, uint256 amount) internal returns(bool success) {
 		// if sending coin from this contract, adds an allowance
 		if (_from == address(this)) {
-			token.approve(_to, amount);
+			token.transfer(_to, amount);
+			return true;
 		}
 		bool transferred = token.transferFrom(_from, _to, amount);
 		require(transferred, "token transfer not successful");
